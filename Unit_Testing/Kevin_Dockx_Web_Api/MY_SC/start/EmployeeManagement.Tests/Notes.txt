@@ -1,0 +1,38 @@
+﻿
+A Private method is an implementation detail that doesn't exist in isolation.
+
+Test the behavior of method that uses Private method
+
+Making a private method public just to be able to test it breaks encapsulation.
+
+- Setting up tests and sharing test context
+  - Constructor and dispose
+    - Set up context in constructor and clean up in dispose.
+    - Context recreated for each test.
+    - Test class instance is not shared.
+  - Class fixture
+    - Create a single test context shared among all tests in class.
+    - Contexts is cleaned up after all tests in the class have finished.
+    - Use when context creation and clean up is expensive.
+    - Dont let a test depend on changes made  to the context by other tests
+      - Test must remain isolated
+      - You dont have control over the order in which tests are run.
+
+  - Collection fixture
+    - Create a single test context shared among tests in several test classes.
+    - Context is cleaned up after all tests across classes have finished.
+    - Use when context creation and clean-up is expensive.
+
+- In asp net core, dependencies are often resolved via built in IoC container.
+- But in tests, newing up dependencies is the preferred approach.
+- But if the class has got lots of dependencies, you have to integrate with DI system.
+
+* By default, Tests are grouped by class in test explorer.
+* Use Trait to create a grouping.
+* Use Fact(Skip = ) to skip a test.
+* To log extra diagnostics - ITestOutputHelper
+
+- Fact : A test which is always true. They test invariant conditions.
+- Theory: A test which is only true for a particular set of data.
+  - [InlineData],[MemberData],[ClassData]
+  - [MemberData] - Share test data across tests.
