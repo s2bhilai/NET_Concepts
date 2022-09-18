@@ -36,3 +36,133 @@ Making a private method public just to be able to test it breaks encapsulation.
 - Theory: A test which is only true for a particular set of data.
   - [InlineData],[MemberData],[ClassData]
   - [MemberData] - Share test data across tests.
+
+* Unit tests should be isolated from other components of the system
+  - db calls, filesystem,network...
+  - other dependencies like factories, respoitories, custom services etc...
+
+- Test Double: A generic term for any case where you replace a production object 
+  for testing purpose.
+  - Fake
+      Working implementation not suitable for prod use. ( sql lite in memory db)
+  - Dummy
+      A test double that's never accessed or used.
+  - Stub 
+      A test double that provides fake data to the system under test.
+  - Spy
+      A test double capable of capturing indirect output and providing indirect input 
+      as needed.
+  - Mock
+      A test double that implements the expected behaviour.
+
+* EF Core provides a set of built in functionalities 
+  to easily enable testing & test isolation.
+  - Avoid calling in to Real database.
+  - Use in-memory implementations instead.
+
+  - In-memory database provider
+    - Simple scenarios.
+    - Not the best option.
+  - SQL Lite in memory mode
+    - Best compatibility with real database.
+
+
+* Use Moq to mock the dependencies of object to be tested, 
+  dont mock the object to be tested.
+
+  - Abstract classes and interfaces also can be mocked.
+  - We can also use Mock in ClassFixture.
+
+  - Mock is better suited to classes with overridable behaviors, abstract classes and 
+    interfaces. If a method has Virtual, then we can set up that method but if method returs 
+    concrete types, then we cannot set up that method in Moq.
+
+  - When 2 potential set up matches, the last one defined wins.
+
+* High code coverage % is not an indicator of success, or of code quality.
+  A high code coverage % only truly represents the amount of code covered by unit tests.
+
+  - Trying to achieve 100 % code coverage can be counter productive.
+
+
+Unit Testing API Controllers
+
+- Test Isolation is important
+  - Avoid Model Binding,filters,routing...
+
+  Unit test
+  - Expected Return Type
+  - Expected type of returned data
+  - Expected values of returned data
+  - other action logic that's not framework related code.
+
+  - Concerns when unit testing controllers ( few)
+    - Mocking controller dependencies.
+    - Working with ModelState in tests.
+    - Dealing with HttpContext
+    - Working with HttpClient calls in tests.
+    - etc...
+
+- Tsting with HttpContext
+  - Use the default built in implementation - DefaultHttpContext
+  - Use Moq of Mocking - Mock<HttpContext>
+
+* If we are asserting an interface use IsAssignableFrom<>, As IsType<> will not work.
+
+- Test Custom Middleware, not built-in middleware
+  - Concerns when unit testing middleware:
+    - Mock the HttpContext( or use DefaultHttpContext)
+    - Handle RequestDelegate
+
+- A filter allows code to run before or after specific stages 
+  in the request processing pipeline.
+
+- Custom Filters often handle cross-cutting concerns
+  - Error Handling
+  - Caching
+
+- Filters can be used to avoid code duplication.
+
+- Action Filters
+- Authorization Filters
+- Resource Filter
+- Exception Filter
+- Result Filter
+
+- Action Filters: Run b4 and after an action method is called
+  - Can change the arguments passed into action.
+  - Can change the result returned from action.
+
+- Run test in CLI - dotnet test
+  - dotnet test -?
+  - dotnet test --filter "Category=sdfgsdfgdfg"
+
+Test Runner: The program (may be a third party plugin to a program) that is responsible
+             for looking for one or more assemblies with tests in them and activating
+             the test frameworks that it finds in those assemblies.
+             -- xunit.runner.visualstudio
+
+Test Framework: The code that has detailed knowledge of how 
+                to discover and run unit tests. -- xUnit
+
+Running tests in parallel allows a set of tests to finish faster, 
+locally and on your build server.
+
+Test Runner: A Runner can support running different test assemblies in parallel.
+
+Test Framework: support running tests with in a single assembly in parallel.
+
+- Parallelism in test frameworks: 
+- By default tests in different classes is run in parallel by xUnit.
+- xUnit by default uses test collection to decide which tests to run in parallel.
+  Considers every test class to be unique test collection.so different classes run in
+  parallel.
+- Tests with in the same class will not run in parallel.
+
+- Tests with in the same collection do not run in parallel, even if they are 
+  divided across different classes. - [Collection("No Parallel")]
+
+- Parallelism in test runner
+
+- xUnit supports running tests against multiple target frameworks.
+  - useful when developing frameworks or libraries.
