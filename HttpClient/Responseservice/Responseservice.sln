@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Responseservice", "Responseservice\Responseservice.csproj", "{3C178266-A9ED-4D24-9A63-D112F20DC779}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3C178266-A9ED-4D24-9A63-D112F20DC779}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C178266-A9ED-4D24-9A63-D112F20DC779}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C178266-A9ED-4D24-9A63-D112F20DC779}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C178266-A9ED-4D24-9A63-D112F20DC779}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8668C189-DD0F-4F06-9CD9-7EA6EB7294CD}
+	EndGlobalSection
+EndGlobal

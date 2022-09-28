@@ -19,7 +19,7 @@ namespace ConsoleApp_RawCoding
             DynamicQuery query = new DynamicQuery();
             query.RunTimeState();
 
-            Console.ReadLine();
+            //Console.ReadLine();
 
             var user = new User();
             Expression<Func<User, object>> exp = user => user.Name;

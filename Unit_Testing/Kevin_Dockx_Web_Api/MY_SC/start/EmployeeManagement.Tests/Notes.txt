@@ -166,3 +166,5 @@ Test Framework: support running tests with in a single assembly in parallel.
 
 - xUnit supports running tests against multiple target frameworks.
   - useful when developing frameworks or libraries.
+
+- Extension methods cannot be mocked.
