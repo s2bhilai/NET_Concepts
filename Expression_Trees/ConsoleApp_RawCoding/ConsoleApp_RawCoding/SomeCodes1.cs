@@ -35,5 +35,19 @@ namespace ConsoleApp_RawCoding
         // lambda expression assigned to Func<T> compiles into executable code and 
         //the lambda expression 
         //assigned to Expression<TDelegate> type compiles into Expression tree.
+
+        //Executable code excutes in the same application domain to process over in-memory collection.
+
+        //LINQ query for LINQ-to-SQL or Entity Framework is not executed in the same app domain.
+        //var query = from s in dbContext.Students
+        //where s.Age >= 18
+        //  select s;
+
+        //It is first translated into an SQL statement and then executed on the database server.
+
+        //It is obviously going to be much easier to translate a data structure 
+        //such as an expression tree into SQL than it is to translate raw IL or 
+        //executable code into SQL because, 
+        //as you have seen, it is easy to retrieve information from an expression.
     }
 }

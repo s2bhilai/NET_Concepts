@@ -1,0 +1,650 @@
+﻿* Object Relational Mapper
+* DbContext provides EF Core's database connectivity and tracks changes to objects.
+* DbSet wraps the classes that EF Core will work with.
+
+* EF Core uses "conventions" to infer the schema of the database you are working with.
+* You must specify data provider and connection string.
+* EF Core Convention recognizes Id as Key Property.
+
+Query Workflow
+* Express and execute query - context.Authors.ToList()
+* EF Core reads model, works with provider to work out SQL. (Internally EF Core does
+   cache queries and reuses them).
+* Sends SQL to database - select * from Authors
+* Receives tabular results.
+* Materializes results as objects.
+* Adds tracking details to DbContext instance.( By default)
+
+# Queries are composable. You don't need to convey them in single expression.
+  var query = context.Authors;
+  var authors = query.ToList();
+
+* Triggering Queries via Enumeration
+  - Db connection remains open during query enumeration.
+
+  //Good Enumeration
+  foreach(var a in context.Authors) {
+    Console.WriteLine("Good Enumeration");
+  }
+
+  //Bad Enumeration. Lots of work for each result.
+  //Connection stays open until last result is fetched.
+  foreach(var a in context.Authors) {
+    RunSomeValidator();
+    CallSmeService();
+    Console.WriteLine("Good Enumeration");
+  }
+
+  //Execution - Better to get results first
+  var authors = context.Authors.ToList();
+  foreach(var a in authors) {
+  
+  }
+
+
+* EF Core protects by default from SQL Injection attacks.
+* Parametrized queries protect your database from SQL Injection attacks.
+  - .Where(e.FirstName == "Subin"); //No Parameter created in SQL
+  - .Where(e.FirstName == name); // Parameter is created in SQL.
+
+* Filtering partial text in queries
+  - EF.Functions.Like(property,%abc%); -- sql like(%abc%)
+  - property.Contains(abc); -- sql like(%abc%)
+
+* Finding an entity using its key value
+  - DbSet.Find(keyValue) - in SQL - select TOP(1) from...; KeyValue is also parametrized when sql query generates.
+  - Not a LINQ method
+  - Executes immediately
+  - If Key is found in change tracker, avoids unneeded database query.
+
+  * SKIP and TAKE for paging
+    - Skip(0).Take(10)
+    - Skip(10).Take(10)
+
+* If we use multiple OrderBy() methods then LINQ will consider only the last one and ignores 
+  others, so we have to use OrderBy().ThenBy().
+
+* Aggregate Execution Methods - First(),Single(),Last(),Count(),Min(),Max(),Average(),Sum()
+  No Aggregation - ToList(),AsEnumerable()
+
+* Last() require query to have an OrderBy() method otherwise will throw an exception.
+
+* Change Tracking is expensive - If anything is for display only,  user will not be editing it 
+  then disable change Tracking
+
+* Most Common Scenario for No Tracking: Web and Mobile Apps.
+
+- No Tracking Queries and Db Contexts
+  - context.Authors.AsNoTracking().FirstOrDefault(); // AsNoTracking returns query, not a DbSet.
+  - onConfiguring() { .UseSqlServer().UseQueryTrackingBehavior.NoTracking } // All queries
+    for this DbContext will default to no tracking.
+    - Use DbSet.AsTracking() for special cases.
+
+# Tracking Components
+
+- DbContext: Represents a session with the database.
+  DbContext.ChangeTracker: Manages a collection of EntityEntry objects.
+  EntityEntry: State info for each entity: Current Values, Original Values, 
+      State enum, Entity and more.
+
+  Entities: Inmemory objects with key(identity) properties that the DbContext is aware of.
+  DbContext: Contains EntityEntry objects with reference pointers to inmemory objects.
+
+# Tracking and Saving Workflow
+
+  - EF Core creates tracking object for each entity.Tracking States - Unchanged (Default),
+    Added,Modified,Delete.
+  - DbContext maintains EntityEntries {Subin,Modified},{Sai,Updated}.
+  - OnSaveChanges 
+    - DbContext updates state for tracked entities.
+    - Works with provider to compose SQL statements.
+    - Executes statements on database.
+  - Returns # Affected and new PKs.
+  - Updates Entity PKs and FKs
+  - Reset the EntitEntry state to original value - Unchanged.
+
+* Add from DbSet/DbContext
+  - context.Atuhors.Add(): Track Via DbSet: DbSet knows the Type, DbContext knows its Added.
+  - context.Add(): Track Via DbContext: DbContext will discover type, knows its Added.
+
+* EF Core will always parametrize all Insert,Update,Delete commands.
+
+* After adding (insert to DB) , DbContext will update the state of the 
+  EntityEntry (change tracking object) (i.e Id) that is tracking this author and then will
+  reset its state - now its unchanged.
+
+* How DbCOntext Discovers about changes
+  - DbContext.CHangeTracker.DetectChanges(): Reads each object being tracked and updates state
+    details in EntityEntry object.
+
+  - DbContext.SaveChanges(): Always calls DetectChanges for you.
+  - You can call DetectChanges() in your code if needed.
+
+  - ChangeTracker.DebugView presents details from Change Tracker.
+
+* THe entities are just plain objects and dont communicate their changes to DbCOntext but the
+  context has references to each of the entities and DetectChanges will be reading the 
+  values and detects the entity state.
+
+# Updating UnTracked objects
+
+- context.Authors.Update(): Track Via DbSet, Knows its Modified
+- Track via DBCOntext: DbContext will discover the type.
+
+- Update will tell the change tracker that every field is modified, so in the update sql 
+  query all fields are updated.
+
+- Update is not typically needed when object is tracked bcoz context will be having all the
+  information and calling DetectChanges() will work fine for them.
+
+# Deleting Objects
+
+- Context needs to trackk the entity.
+- Then you Delete("remove") entity.
+- EF Core sends relevant SQL to database on SaveChanges.
+
+# Tracking Multiple Objects
+
+- AddRange
+- Via DbSet - AddRange(),UpdateRange(),RemoveRange()
+- Via DbContext - AddRange(),UpdateRange(),RemoveRange()
+- Faster to send individual commands for 1-3 entities.
+- Faster to send batched commands for 4+ entries.
+
+# EF Core Migrations
+- DbContext + Conventional and custom mappings = Database Schema
+- Migrations Workflow:
+  1) Define/CHange model
+  2) Create a migration file
+  3) Apply migration to DB or script.
+- EF Core Migrations are source control friendly.
+
+- Creating and excuting migrations happens at design time.
+- Microsoft.EntityFrameworkCore.Tools nuget pkg. 
+  - As per csproj settings - privateassets,includeassets this dll is available at design time
+    and not available when taking build for deployment.
+
+# Using Migrations in Visual Studio
+* When EF COre Is in a class library project
+  - Install Tools pkg into executable project(e.g console).
+  - Ensure the executable project is the start up project.
+  - Set Package manager console "default project" to class library with EF Core( where 
+    DbContext is defined).
+  - Add-Migration tasks
+    - Read DbContext and determine data model.
+    - Create a migration file describing how to construct db schema.
+
+* Read DbContext to determine data model.
+* Compare data model to snapshot.
+* Generate migration file to apply deltas.
+* Create updated snapshot file.
+
+* Snapshot easily becomes part of source control repository.
+* Some Default EF Core mapping convention
+  - DbSet name is the table name.
+  - Class property name is column name.
+  - Create index for every foreign key discovered in model.
+
+* Update-Database: Apply migrations directly to database
+  - Reads migration file
+  - Generates SQL in memory.
+  - Creates the database if needed.
+  - Runs SQL on the database.
+  - APIs internal code will create the database before executing migration code.
+
+* Script-migration: Apply migrations to SQL script
+  - You must create the database before running the script.
+
+* Specify seed data with ModelBuilder HasData Method
+  - Provide all parameters including keys and foreign keys.
+  - HasData will get interpreted into migrations.
+  - Inserts will get interpreted into SQL.
+  - Data will get inserted when migrations are executed.
+  - HasData will also be recognized and applied by EnsureCreated.
+
+* Scripting migrations works differently than update-database so requires more control
+  - script-migration: (Default) Scripts every migration.
+  - script-migration -idempotent: Scripts all migration but checks for each object first
+    e.g, table already exists.
+
+
+# How EF Core Determines mappings to DB
+  - Conventions (Default assumptions)
+  - Override with Fluent mappings (Apply in DbContext using Fluent API)
+  - Override with Data Annotations (Apply in Entity)
+
+# One to Many
+  - A row in a child table has a foreign key pointing to parent's table.
+  - And there should be a constraint defined between them.
+  - A list type or some collection is enough to recognize by EF that it's a One to Many
+    relationship.
+  - The child does not require any reference back to parent.
+  - Foreign Key (eg AuthorId) will be inferred in database.
+  - 2nd way of One to Many - Child has navigation prop pointing to parent
+  - It already understands one to many because of parent's List<Child>
+  - The reference back to parent aka Navigation Property is a bonus.
+  - AuthorId recognized as Foreign Key due to 2 reasons:
+    - the known relationship with parent
+    - Follows naming convention(type + id)
+  - 3rd way - child has navigation property point to parent and an foreign key
+  - No relationship - If we remove List<Book> from primary entity then no relationship 
+    is defined.Also on child no navigation property only AuthorId is defined.
+  - When convention can't discover because there are no references, use
+    modelBuilder.Entity<Author>().HasMany<Book>().WithOne();
+* Benefits from Foreign key
+  - Dont use Navigations if business logic does not requires it.
+  - Only have navigation property:
+    author.Books.ADd(abook);
+    abook.Author = someAuthor;
+    You must have an author in memory to connect to a book.
+  - With Foreign key property you dont need author object
+    book.AuthorId = 1
+  - Foreign key helps in seeding data
+    HasData requires explicit primary and foreign key to be set.
+
+* Mapping unconventional foreign key:
+   .WithOne().HasForeignKey(b => b.AuthorFK);
+
+* by default every dependent must have an principal, but EF Core does not enforce this.
+  - Few ways to achieve the case where you want to add dependent entity without principal
+  - Allow Optional Parent - set the FK property as nullable
+  - public int? AuthorId {get;set;}
+  - or Map the FK property as Not required
+  - .HasForeignKey(b => b.AuthorId).IsRequired(false);
+  - When foreign key property does not exist: map the inferred shadow property as not required
+    .HasForeignKey("AuthorId").IsRequired(false);
+
+# EF Core Logging Capabilities
+  - EF Core Captures
+    - SQL
+    - CHangeTracker activity
+    - Interaction with database
+    - Database transactions
+  - EF Core Specific configurations:
+    - ENableDetailedErrors,EnableSensitiveData
+    - Filter based on message type
+  - DbContextOptionsBuilder.LogTo
+  - By default, parameter information is hidden in the logs.
+  - Expose explicitly - EnableSensitiveDataLogging.
+
+# ChangeTracker  response to new child of existing parent
+  - Add child to child collection of existing tracked parent. - SaveChanges
+  - Add existing tracked parent to ref property of child. - SaveChanges
+  - Set foreign key property in child class to parent's key value - Add & SaveChanges.
+
+# Means to get related data from the database
+  - Eager Loading - Include related objects in query.
+  - Query Projections - Define the shape of query results.
+  - Lazy Loading - On-the-fly retrieval of data related to objects in memory.
+  - Explicit Loading - Explicitly request related data for objects in memory.
+
+# Eager Loading
+  - By default, Include() returns the entire collection. - Left Join
+  - From EF Core 5, We can filter and sort the Include data.
+  - Using Include for multiple layers f relationship
+  - context.Authors.Include(a => a.Books).ThenInclude(b => b.BookJackets).ToList()
+  - context.Authors.Include(a => a.Books).Include(a => a.ContactInfo).ToList()
+  - context.Authors.Include(a => a.Books.BookJackets).ToList() // Get jackets, dont get books
+  - Composing many Include in one query could create performance issues.
+  - Include() defaults to a single SQL command. Use AsSplitQuery() to send multiple 
+    SQL commands instead.
+
+# Query Projections - Define the shape of query results.
+  - Use LINQ's Select method.
+  - Use a lambda expression to specify properties to retrieve.
+  - Instantiate a type to capture the resulting structure.
+  - Anonymous types are not available outside of method.
+  - Anonymous types are only ever known to the method they are within. Use dynamic, class
+    or struct to share.
+  - EF COre can only track entities recognized by DB Context
+  - Anonymous types are not tracked.
+  - Entities that are properties of an anonymous type are tracked.
+    ( For ex a=> new{ Books = a.Books }); // Book will be tracked
+
+ # Loading related data for Objects already in memory.
+   - Explicit Loading - explicitly request related data for objects in memory.
+   - Lazy Loading - On the fly retrieval of data related to objects in memory.
+   - Explicit Loading: Explicitly retrieve related data for objects already in memory.
+     - DbContext.Entry(object).Collection().Load()
+     - DbContext.Entry(object).Reference().Load()
+     - With author object already in memory, load a collection
+       context.Entry(author).Collection(a=>a.Books).Load()
+     - With book object already in memory, load a reference ( e.g parent or 1:1)
+       context.Entry(book).Reference(b => b.Author).Load()
+     - We can only use Load from single object, cannot use list of authors.
+     - Use profiling to determine whether LINQ will be better to load from list of Authors.
+     - Can also use Filter on Loading using 'Query'
+       context.Entry(author).Collection(a => a.Books)
+       .Query().Where(b => b.Title.Contains("newf"))
+       .ToList()
+    - Lazy Loading: 
+      - Lazy Loading easy to misuse.
+      - Lazy Loading is OFF by default in EF Core.
+      - Enabling Lazy Loading
+        - Every navigation property in every entity must be virtual.
+        - Reference microsoft.entityframework.proxies package.
+        - use the proxy logic provided by that package
+          - optionsBuilder.UseLazyLoadingProxies()
+        //Good way
+        foreach(var b in author.Books)
+        { }
+        - One command sent to database to get the author's books.
+        // Behaviour to avoid
+        - var bookCount = author.Books.Count();
+          // Retrieves all Book objects from database and materializes them and then gives you the count
+        - Data bind a grid to lazily load data
+          // Sends N+1 commands to the database as each author's books is loaded into a grid row.
+          // Loads row by row
+        - Lazy loading when no context in scope
+          //No data is retrieved
+
+  # EF Core's Default Entity State
+               has Key Value     no Key Value
+   
+  Add(graph)    Added             Added
+  update(graph) Modified          Added
+  Attach(graph) Unchanged         Added
+
+  *  EF Core enforces cascade deletes.
+     Any related data that is also tracked will be marked as deleted along with 
+     principle object.
+
+# 3 ways to define Many to Many
+  - Skip Navigations - Most common direct refs from both ends. (most freq used)
+  - Skip with payload - Allows database generated data in extra columns.
+  - Explicit Join class - Additional properties accessible via code.
+
+  - same 4 patterns for many to many
+    - Eager Loading: include related objects in memory.
+    - Query Projections: Define the shape of query results.
+    - Explicit loading: Explicitly request related data for objects in memory.
+    - Lazy Loading: on the fly retrieval of data related to objects in memory.
+
+* Removing joins in many to many relationships
+* Reassigning relationships (Move cover from one artist to another)
+  - In One to many EF Core knows the dependent can have only 1 principal.
+  - In Many to many, an object can be joined to unlimited partner ends.
+  - Remove the existing join
+  - Then create the new join
+
+
+** One to One relationship
+
+  - DbContext must be able to identify a principal ("parent") and 
+    a dependent ("Child").
+
+Common ways EF Core Identifies One to One
+- Navigations on both ends with FK independent.
+- Navigation on one end, FK on the other.
+[ EF Core will recognize one to one and identify dependent]
+
+- Navigations on both ends
+  [ EF Core requires a mapping to define principal/dependent ]
+
+- by default, Cover is optional. Database constraint will allow books to be 
+  inserted without cover.
+- Principals are required by default. A cover can't exist without book. Your 
+  business logic is responsible for following this rule.
+
+- Order of operations for migration
+  - Add new BookId column
+  - Updates BookId column values
+  - Applies index
+  - Adds foreign key contraint
+
+- Multi Level Query
+  - Using multiple includes and ThenInclude to query more deeply into a graph.
+  Performance consideration with Include
+  - Composing many Includes in one query could create performance issues.
+    We can disable change tracking AsNoTracking if no change tracking required
+    for ex. pulling the data for reports.
+  - Use AsSplitQuery() to send multiple SQL commands instead.
+
+  - Summary
+    - EF Core needs to be able to identify Principal and Child.
+    - Simplest is navigation path in both ends with FK in dependent.
+    - Default: Child is optional, parent is required, cascade delete.   
+
+- Two DbSet Methods to Query using your SQL
+  - DbSet.FromSqlRaw() : Use parameters to avoid SQL Injection.
+  - DbSet.FromSqlInterpolated()
+  - Expects results to be in the shape of DbSet's entity.
+
+- Never use SQL with parameters embedded directly into the string.
+
+* Reviewing EF Core's Lifecycle in disconnected apps
+  - Working in a single DbContext instance - Connected Data Access
+    - Retrieve Data - context starts tracking state of each returned object
+    - modify Objects
+    - Save Changes - context updates state of tracked objects before determining SQL.
+    - Client storing data locally.
+    - Network connected clients where client can access database on same network.
+  - Disconnected Data Access
+    - UI is diconnected from back end
+    - website interacting with web service or web api.
+    - each method for retrieve or update data will instantiate own dbcontexts.
+    - Short lived Dbcontexts
+    - Controller instance per request.
+    - DbContext per controller instance.
+    Query Performance Bonus in Web Apps
+    - The context can't track data on client device.
+    - Dont waste time and resources tracking.
+    - Use no tracking queries
+    - In fact, just make the entire DbContext a no tracking context.
+    Various ways to inform context of State
+    - DbSet methods - Add,Update
+    - Set DbEntry.State
+    - Retrieve and modify from database.
+
+* In disconnected scenarios, it's up to you to inform the context about object state.
+
+## EF Core Testing
+
+- Testing EF Core Directly or Indirectly
+  - Validate your DbContext against the database.
+  - Validate your business logic that uses the DbContext and database.
+  - Validate your business logic against the DbContext.
+
+## Adding More Practical Mappings
+
+- Reference Types can be null.For Ex, string or variable can exists without being initialized.
+- Lead to Null Reference Exception.
+- For this all projects have enabled Nullable Reference Types.
+- The compiler will warn you (green lines) where a null value can cause problems.
+- EF Core mappings are affected by project's nullable settings.
+
+* With nullable disable
+  - strings are nullable by default.
+  - Database column will be nullable.
+  - Alternate Mapping: Property().IsRequired maps DB columns as non-nullable.
+* With nullable enabled
+  - string props have compiler warnings.
+  - Database column will be non nullable.
+  - DB enforces the constraint.
+  - Alternate: string? : Compiler will allow nulls and database column nullable.
+
+- Index is created on foreign keys. Use HasIndex to change or add more.
+- All properties are mapped, Use Ignore to exclude it from database,queries and saves.
+  modelBuilder.Entity<e>().Ignore(e => e.Property)
+
+- All reachable entities are mapped.
+- Some More EF Core Mapping Support
+  - Inheritance
+  - Backing Fields
+  - Concurrency Tokens
+  - Composite Keys
+  - DB value generation
+  - Splitting entities across tables.
+
+- Why Favor Fluent API over Data Annotations
+  - Data annotations provide only a small subset of mappings.
+  - Domain classes should not know about persistence.
+  - Mappings are not scattered across various classes. All in one place in DbContext.
+
+# Enums in EF Core
+- public enum BookGnre {Fiction,History}
+- By default, .NET enum types are ints
+- int values will be assigned to each member, default 1,2,3 etc.
+- EF Core will store the underlying member value into database (2).
+- EF Core will translate the value back into the enum when materialized.
+- Also supports bitwise enums.
+
+# Why do we need value conversion ?
+
+- EF Core can map to pre-defined set of known database types that are common to RDBMS.
+- You can help it to map .NET types that dont have relevant database type.
+- Ex: Color struct
+- Value conversions - Built in converters or custom converters.
+- .HasConversion<string>
+- Define a class that inherits from ValueConverter and use that as HasConversion parameter.
+- Or use lambda methods for conversion on storing and retrieving as below
+- modelBuilder.Entity<Book>().Property(b => b.PrimaryColor)
+  .HasConversion(c => c.ToString(),s => Color.FromName(s));
+
+## Applying Buld Configurations instead of one by one
+- OnConfiguring,ConfigureConventions,OnModelCreating
+- overide DbContext.ConfigureConventions
+- Apply configurations to configurationBuilder.Properties<T>
+- override anomalies with individual configuration.
+- Ex: Bulk configuration for all string
+- configurationBuilder.Properties<string>().HaveColumnType("varchar(100)");
+- otherwise we would have to apply individually to all properties
+- modelBuilder.Entity<Author>().Property(a => a.FirstName).HasColumnType("varchar(100)").
+- ** Bulk value conversion
+- Built in - configurationBuilder.Properties<BookGenre>.HaveConversion<string>();
+
+## Mapping complex types and value objects
+- Not every property is a scalar type or a relationship.
+- Create New Type that encapsulates repeated members and logic - No key property!!
+- public class PersonName
+  {
+    public string First {get;set}
+    public string Last {get;set;}
+    public string Full => $"{First} {Last}"
+  }
+
+  public class Author 
+  {
+    public int AuthorId {get; set;}
+    public PersonName Name {get;set;}
+  }
+- Now EF Core will throw exception that PersonName needs Key Property.
+- So map these as "Owned Entities"
+- modelBuilder.Entity<Author>().OwnsOne(a => a.Name);
+- The properties of the owned type are by default stored as columns in the owner table.
+
+## Understanding EF Core's Database Connectivity.
+
+- Microsoft created providers
+- SqlServer
+- Sqlite
+- InMemory
+- Cosmos
+
+- EF Core builds an Expression Tree for composing commands.
+- Provider reads expression tree and builds appropriate SQL.
+- EF Core executes the SQL on the database.
+
+- SaveCHanges always wrapped in a DB Transaction.
+- If any command fails, everything will rolled back and EF Core will throw exception with details.
+
+- Control workflow of default via Database.Transaction.
+- Override with an ADO.Net database transaction.
+- Override with System.Transactions.
+
+- SaveCHanges uses Optimistic concurrency.
+- throws an DbUpdateConcurrencyException on error and rolls back the transaction.
+
+## Dynamically Specify conn strings
+   - asp net core appsettings.json.
+   - Use EF Core Interceptors to change conn string on the fly.
+
+- Connection Pooling is controlled by the provider, not EF Core.
+- We can use DbContext Pooling for performance.
+- Apply with AddDbContextPool instead of AddDbContext.
+- It also pools connection and other database resources.
+
+# what if connection gets dropped during command execution
+  - Built in connection resiliency.
+  - Use default EnableRetryOnFailure
+    optionsBuilder.UseSqlServer(conn,o => o.EnableRetryOnFailure());
+  - Specify custom behavior via ExecutionStrategy class to control retry counts and more.
+
+
+## Exploring ChangeTracker Entries for overriding the SaveCHanges method
+   - SaveChanges method is virtual.
+   - You can override SaveCHanges in your DbContext class.
+   - Add logic just before or just after EF Core calls SaveCHanges internally.
+   - Accessing ChangeTracker EntityEntries: DbContext.ChangeTracker.Entries().ToList();
+   - EF Core uses the info in these entries to construct its SQL command.
+   public override int SaveCHanges()
+   {
+     //Perform your custom logic on ChangeTracker.Entries() or other data
+     return base.SaveChanges(); // sends data to database
+   }
+
+   public override int SaveCHanges()
+   {
+     //perform your custom logic on ChangeTracker.Entries() or other data
+     int affected = base.SaveChanges(); //sends data to database
+     //perform some other custom logic after DB calls
+     return affected;
+   }
+   - Call base.SaveChanges, which will send commands to database.
+
+   - Updating Shadow Properties during savechanges
+     - Why Shadow Peperties?
+       - Store data that's irrelevant to your business logic.
+       - Ex: Row created/updated timestamps: User who created/updated row.
+       - Useful for reports against the database such as auditing.
+       - Extraneous to business logic and would be in the way.
+     - Defined by DbContext and persisted into database.
+     - Use migrations to get the new property into database.
+     - Use DbContext to set values.
+     - Just before savechanges builds SQL is a great time to set values.
+     private void UpdateAuditData()
+     {
+       foreach(var e in ChangeTracker.Entries().Where(e => e.Entity is Author))
+       {
+         entry.Property("LastUpdated").CurrentValue = DateTime.Now;
+       }
+     }
+     
+     public override int SaveCHanges()
+     {
+       updateAuditData();
+       return base.SaveCHanges();
+     }
+
+### Events exposed in EF Core API
+
+  - DbContext.SavingChanges - triggered b4 savechanges is called.
+  - DbContext.SavedChanges - called after savechanges.
+  - DbContext.SaveChangesFailed.
+  - ChangeTracker.Tracked
+  - ChangeTracker.StateChanged
+
+  - SavingChanges += SavingChangesHandler;
+
+  - private void SavingChangesHandler(object sender,SavingChangesEventArgs e)
+    {
+      UpdateAuditData();
+    }
+
+### Interceptors
+  - EF Core interceptors enable interception,modification and/or suppression of EF Core
+    operations. This includes low level database operations such as executing a command,as well
+    as high level operations, such as calls to SaveChanges.
+
+  - IDbCommandInterceptor: Before sending a command to DB. After command has executed.
+    Command failures,Disposing the command's DbDataReader.
+  - IDbConnectionInterceptor: Opening and closing connection.
+  - IDbTransactionInterceptor.
+
+  - Create a class which inherits frm DbCommandInterceptor.
+
+  - Interceptors can help implement soft deletes.
+    - Detect delete command
+    - Replace with a command to update and set isdeleted to true.
+
+
